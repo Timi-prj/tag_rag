@@ -1,0 +1,181 @@
+import typing
+from typing import List, Dict, Optional
+from src.common.types import MarkdownElement, ElementType
+
+class ScopeBuilderNode:
+    """
+    作用域构建节点 (ScopeBuilder)
+    """
+
+    def __init__(self, config):
+        self.config = config
+        self.max_chars = self.config.chunk_max_chars
+        self.overlap = self.config.chunk_overlap
+        self.hard_max_chars = self.config.chunk_hard_max_chars
+
+        # 运行时状态
+        self.header_stack: List[MarkdownElement] = []
+        self.buffer_elements: List[Dict] = []
+        self.current_char_count = 0
+        self.file_path = "unknown" # 存储相对路径
+
+    def run(self, input_stream: typing.Generator, file_path: str) -> typing.Generator[Dict, None, None]:
+        """
+        :param input_stream: yield (element, tags)
+        :param file_path: 文件的相对路径 (例如: "folder/test.md")
+        """
+        self.file_path = file_path # 保存完整相对路径
+        self._reset_state()
+
+        for element, local_tags in input_stream:
+            # 1. 维护 Header 栈
+            if element.type == ElementType.HEADER:
+                self._update_header_stack(element)
+
+            # 2. 尝试添加元素到缓冲区
+            chunks = self._process_element(element, local_tags)
+            
+            for chunk in chunks:
+                if chunk:
+                    yield chunk
+
+        # 3. 处理剩余缓冲区
+        last_chunk = self._flush_buffer()
+        if last_chunk:
+            yield last_chunk
+
+    def _reset_state(self):
+        self.header_stack = []
+        self.buffer_elements = []
+        self.current_char_count = 0
+
+    def _update_header_stack(self, header: MarkdownElement):
+        while self.header_stack and self.header_stack[-1].level >= header.level:
+            self.header_stack.pop()
+        self.header_stack.append(header)
+
+    def _process_element(self, element: MarkdownElement, tags: List[Dict]) -> List[Dict]:
+        output_chunks = []
+        elem_len = len(element.content)
+
+        # 硬上限检查
+        if self.hard_max_chars > 0 and (self.current_char_count + elem_len > self.hard_max_chars):
+            chunk = self._flush_buffer()
+            if chunk: 
+                output_chunks.append(chunk)
+
+        # 软上限检查
+        elif (self.current_char_count + elem_len > self.max_chars) and self.buffer_elements:
+            chunk = self._flush_buffer()
+            if chunk:
+                output_chunks.append(chunk)
+        
+        self.buffer_elements.append({
+            "element": element,
+            "tags": tags,
+            "headers_snapshot": list(self.header_stack) 
+        })
+        self.current_char_count += elem_len
+        return output_chunks
+
+    def _flush_buffer(self) -> Optional[Dict]:
+        if not self.buffer_elements:
+            return None
+
+        # 1. 过滤逻辑：如果只有 Header 类型的元素，不输出
+        has_content = False
+        for item in self.buffer_elements:
+            if item['element'].type != ElementType.HEADER:
+                has_content = True
+                break
+        
+        if not has_content:
+            self.buffer_elements = []
+            self.current_char_count = 0
+            return None
+
+        # 2. 拼接文本
+        text_parts = [item['element'].content for item in self.buffer_elements]
+        full_text = "\n".join(text_parts)
+
+        # 3. 收集普通标签 (去重)
+        collected_tags = []
+        seen_tags = set()
+        for item in self.buffer_elements:
+            for tag in item['tags']:
+                tag_id = f"{tag.get('key')}:{tag.get('value')}"
+                if tag_id not in seen_tags:
+                    collected_tags.append(tag)
+                    seen_tags.add(tag_id)
+
+        # 4. 构建系统标签 (Title & FilePath)
+        system_tags = self._build_system_tags()
+        
+        final_tags = system_tags + collected_tags
+
+        chunk_data = {
+            "content": full_text,
+            "tags": final_tags,
+            "metadata": {
+                "char_count": len(full_text)
+            }
+        }
+
+        self.buffer_elements = []
+        self.current_char_count = 0
+        return chunk_data
+
+    def _build_system_tags(self) -> List[Dict]:
+        """
+        构建 file_path 和 title 的标签
+        """
+        sys_tags = []
+        
+        # --- File Path Tag ---
+        # 使用传入的相对路径
+        sys_tags.append({
+            "key": "file_path",
+            "value": self.file_path,
+            "original_text": f"#file_path/{self.file_path}",
+            "scope_level": 0
+        })
+
+        # --- Title Tag ---
+        if self.buffer_elements:
+            # 获取当前上下文的 header 栈
+            headers = self.buffer_elements[0]['headers_snapshot']
+            
+            if headers:
+                # 算法：根据 header 的 level 填充数组
+                # 1. 找出最大层级 (例如 H4 -> 4)
+                max_level = max(h.level for h in headers)
+                
+                # 2. 创建一个全为 'null' 的列表，长度为 max_level
+                # 索引 0 对应 H1, 索引 1 对应 H2 ...
+                path_parts = ["null"] * max_level
+                
+                # 3. 填充存在的标题
+                for h in headers:
+                    # h.level 是 1-based (H1=1), 所以索引是 h.level - 1
+                    # 防止越界保护 (虽然理论上 max_level 保证了不越界)
+                    if 0 < h.level <= max_level:
+                        path_parts[h.level - 1] = h.content
+                
+                # 4. 生成 value (仅包含非 null 的实际标题路径，看着更干净)
+                # 或者如果你希望 value 也包含 null，可以去掉 if p != "null"
+                # 根据示例 "方差/dc7..."，这里只取有效值拼接
+                real_path_str = "/".join([p for p in path_parts if p != "null"])
+                
+                # 5. 生成 original_text (包含 null 占位)
+                # 示例: #title/null/方差/dc7，3k1u/计算逻辑
+                full_path_str = "/".join(path_parts)
+                original_text = f"#title/{full_path_str}"
+                
+                sys_tags.append({
+                    "key": "title",
+                    "value": real_path_str,
+                    "original_text": original_text,
+                    "scope_level": len(headers) # 实际生效的层级深度
+                })
+
+        return sys_tags

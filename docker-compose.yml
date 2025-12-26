@@ -1,0 +1,21 @@
+services:
+  parser:
+    build: .
+    container_name: md_parser_dev
+    
+    # 【核心配置】热挂载：将当前目录 (.) 映射到容器内的 /app
+    # Windows 上的修改会立即同步到容器内
+    volumes:
+      - .:/app
+    # 让容器保持运行状态，不立即退出
+    # 相当于 hang 住容器，方便你随时进入执行命令
+    command: tail -f /dev/null
+    
+    # 资源限制（可选，防止吃光内存）
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+    environment:
+      - PYTHONPATH=/app  # <--- 新增这一行

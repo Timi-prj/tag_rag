@@ -1,0 +1,19 @@
+# === 模块一配置 ===
+parser:
+  input_dir: "./data"
+  output_dir: "./output"
+  chunk_strategy:
+    max_chars: 1000
+    overlap_rows: 2
+
+tags:
+  prefix: "?"
+  exclude_regex:
+    - "^#ignore/.*"
+    - "^#temp$"
+
+# === 模块二配置 (占位) ===
+vector_store:
+  provider: "openai" # 或 milvus, chroma
+  collection_name: "knowledge_base"
+  dimension: 1536
