@@ -22,7 +22,9 @@ class ConfigManager:
 
         # 模块一配置
         p_conf = self._raw.get('parser', {})
+        self.input_dir = p_conf.get('input_dir', './data')
         self.output_dir = p_conf.get('output_dir', './output')
+        self.file_extensions = p_conf.get('file_extensions', ['.md', '.markdown'])
         self.chunk_max_chars = p_conf.get('chunk_strategy', {}).get('max_chars', 1000)
         self.chunk_overlap = p_conf.get('chunk_strategy', {}).get('overlap_rows', 2)
 

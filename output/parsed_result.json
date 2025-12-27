@@ -1,6 +1,6 @@
 [
   {
-    "block_id": "b6fe72fd67b625c1ab551cdbf18586d5",
+    "block_id": "09a8bb0c4eb5320aeec85c2579c9225b",
     "content": "阴阳骰子+5手卡（+1）在各难度下的成功率探索",
     "start_line": 3,
     "end_line": 3,
@@ -12,8 +12,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       }
     ],
     "is_splited": false,
@@ -21,7 +21,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "ccb70e430130d3153d4001fc2ce3abc3",
+    "block_id": "c18c27c121d0a74d70038644012b525b",
     "content": "## promt\n我在设计一款桌游规则, 现在需要构筑数学模型. 有这么几种资源: \n- 明骰的3颗D6, 投掷结果已知; \n- 暗骰的1颗D6, 投掷结果未知(意味着分配+1指示物后再投掷结果, 可能导致消耗了资源却不满足要求); \n- 5个+1指示物, 可以使得骰子结果额外+1(可以超过6). \n当前目标: 单个组合的结果>=7\n流程如下: \n1. 玩家将资源任意分组组合(例如, 明骰的三颗骰子是3,4,6, 分配成3组资源, 分别是3的明骰+4的明骰; 6的明骰和1个指示物, 暗骰和4个指示物)\n2. 投掷暗骰(接之前的例子, 暗骰结果为1)\n3. 计算满足目标的组合数量 (因为1的暗骰和四个指示物的组合最终结果为5, 不满足目标, 最后只有2组组合满足条件; 但如果暗骰结果为3, 则最终结果为7, 满足条件)\n\n追求组合数量尽可能的多, 这种情况下, 最优解和组合数的期望是多少",
     "start_line": 4,
     "end_line": 16,
@@ -38,8 +38,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -52,7 +52,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "9b44874af14d7113632f30bf3a13f4f2",
+    "block_id": "1557ad40341c9c5fa8a63879951a083e",
     "content": "## 期望\n1. **遍历所有已知骰子组合：** 运行我的穷举模型，遍历216种（或56种加权）已知骰子投掷结果。\n2. **获取每个组合的“最优策略”：** 对于每一种投掷结果（例如 `{1,2,3}`），模型已经找到了使其期望收益最大的最优策略（即，特定的分组方式和指示物分配方案）。\n3. **计算该策略下“>=2组合”的概率：**\n    - 这个策略会将资源分成“确定组”和“风险组”。\n    - **确定组的数量 (S)：** 这是固定的，不会变。\n    - **风险组的成功概率 (P)：** 这是由投入的指示物决定的。风险组最多只有1个（因为最优策略总会将未知骰子放在一个独立的组里）。\n    - 现在，我们需要计算最终成功组合数 `C = S + (风险组是否成功)` 大于等于2的概率。\n        - **如果 S >= 2：** 那么无论风险组是否成功，最终组合数都至少是2。概率是 **100%**。\n        - **如果 S = 1：** 那么需要风险组成功，最终组合数才能达到2。概率就是风险组的成功概率 **P**。\n        - **如果 S = 0：** 那么即使风险组成功，最终也只有1个组合，不可能达到2。概率是 **0%**。\n4. **加权平均：** 将每种已知骰子投掷结果（216种）所对应的“>=2组合”的概率相加，然后除以216，得到最终的总概率。",
     "start_line": 18,
     "end_line": 30,
@@ -69,8 +69,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -83,7 +83,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "011cb81307fde1b2090039e8ebb9a607_001",
+    "block_id": "0dd0edd0c5d27fbaa2032e0751bdbe8f_001",
     "content": "|  目标值   | 3已知+1未知 (期望) | 2已知+2未知 (期望) | 1已知+3未知 (期望) |\n| :----: | :----------: | :----------: | :----------: |\n| **7**  |    ~2.21     |    ~1.94     |    ~1.67     |\n| **8**  |    ~1.61     |    ~1.40     |    ~1.22     |\n| **9**  |    ~1.16     |    ~1.03     |    ~0.91     |\n| **10** |    ~0.92     |    ~0.82     |    ~0.73     |\n| **11** |    ~0.72     |    ~0.65     |    ~0.59     |\n| **12** |    ~0.56     |    ~0.51     |    ~0.47     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |",
     "start_line": 31,
     "end_line": 46,
@@ -100,8 +100,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -114,7 +114,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "011cb81307fde1b2090039e8ebb9a607_002",
+    "block_id": "0dd0edd0c5d27fbaa2032e0751bdbe8f_002",
     "content": "|  目标值   | 3已知+1未知 (期望) | 2已知+2未知 (期望) | 1已知+3未知 (期望) |\n| :----: | :----------: | :----------: | :----------: |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |",
     "start_line": 40,
     "end_line": 55,
@@ -131,8 +131,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -145,7 +145,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "011cb81307fde1b2090039e8ebb9a607_003",
+    "block_id": "0dd0edd0c5d27fbaa2032e0751bdbe8f_003",
     "content": "|  目标值   | 3已知+1未知 (期望) | 2已知+2未知 (期望) | 1已知+3未知 (期望) |\n| :----: | :----------: | :----------: | :----------: |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |",
     "start_line": 51,
     "end_line": 74,
@@ -162,8 +162,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -176,7 +176,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "719fdc9044e9acdd97b586826384015a",
+    "block_id": "32e3219100ec9c87ca4e656b7b37eaed",
     "content": "## 方差",
     "start_line": 76,
     "end_line": 76,
@@ -188,8 +188,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -202,7 +202,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "1de79f351dd6a99a210edf827635791f",
+    "block_id": "578e3116a9255cfe2cce58810debebd0",
     "content": "### dc7，3k1u\n\n难度7, 3k+1u下, 能至少2个组合的概率是多少?\n**70.1%**",
     "start_line": 78,
     "end_line": 81,
@@ -214,8 +214,8 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
@@ -228,7 +228,7 @@
     "protected_element_overlength": false
   },
   {
-    "block_id": "d8472f15c907608e9d12f20eb6cf74a3",
+    "block_id": "340487ee077a335899eba31a8500b24c",
     "content": "#### 计算逻辑\n\n1. **遍历所有已知骰子组合：** 运行我的穷举模型，遍历216种（或56种加权）已知骰子投掷结果。\n2. **获取每个组合的“最优策略”：** 对于每一种投掷结果（例如 `{1,2,3}`），模型已经找到了使其期望收益最大的最优策略（即，特定的分组方式和指示物分配方案）。\n3. **计算该策略下“>=2组合”的概率：**\n    - 这个策略会将资源分成“确定组”和“风险组”。\n    - **确定组的数量 (S)：** 这是固定的，不会变。\n    - **风险组的成功概率 (P)：** 这是由投入的指示物决定的。风险组最多只有1个（因为最优策略总会将未知骰子放在一个独立的组里）。\n    - 现在，我们需要计算最终成功组合数 `C = S + (风险组是否成功)` 大于等于2的概率。\n        - **如果 S >= 2：** 那么无论风险组是否成功，最终组合数都至少是2。概率是 **100%**。\n        - **如果 S = 1：** 那么需要风险组成功，最终组合数才能达到2。概率就是风险组的成功概率 **P**。\n        - **如果 S = 0：** 那么即使风险组成功，最终也只有1个组合，不可能达到2。概率是 **0%**。\n4. **加权平均：** 将每种已知骰子投掷结果（216种）所对应的“>=2组合”的概率相加，然后除以216，得到最终的总概率。",
     "start_line": 82,
     "end_line": 94,
@@ -240,13 +240,55 @@
       },
       {
         "key": "file_path",
-        "value": "test.md",
-        "original_text": "#file_path/test.md"
+        "value": "./data/test.md",
+        "original_text": "#file_path/./data/test.md"
       },
       {
         "key": "title",
         "value": "null/方差/dc7，3k1u/计算逻辑",
         "original_text": "#title/null/方差/dc7，3k1u/计算逻辑"
+      }
+    ],
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "block_id": "917fd84c9ed9d067a94185949adfd756",
+    "content": "# Test File 2\nContent of test file 2 with some more text.",
+    "start_line": 1,
+    "end_line": 2,
+    "tags": [
+      {
+        "key": "file_path",
+        "value": "./data/test2.md",
+        "original_text": "#file_path/./data/test2.md"
+      },
+      {
+        "key": "title",
+        "value": "Test File 2",
+        "original_text": "#title/Test File 2"
+      }
+    ],
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "block_id": "5c1d7327efd828f5a15d7760abdfbae3",
+    "content": "# Test File 1\nContent of test file 1.",
+    "start_line": 1,
+    "end_line": 2,
+    "tags": [
+      {
+        "key": "file_path",
+        "value": "./data/test/test1.md",
+        "original_text": "#file_path/./data/test/test1.md"
+      },
+      {
+        "key": "title",
+        "value": "Test File 1",
+        "original_text": "#title/Test File 1"
       }
     ],
     "is_splited": false,
