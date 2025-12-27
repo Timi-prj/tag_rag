@@ -191,7 +191,9 @@ class ScopeBuilderNode:
             title_tag = Tag(key="title", value=header_path, original_text=f"#title/{header_path}")
             active_tags.append(title_tag)
 
-        bid = hashlib.md5(f"{file_path}_{rows[0].index}_{text[:20]}".encode()).hexdigest()
+        # 生成跨文件唯一的block_id
+        base_content_hash = hashlib.md5(text.encode()).hexdigest()[:16]
+        bid = hashlib.md5(f"{file_path}_{rows[0].index}_{rows[-1].index}_{base_content_hash}".encode()).hexdigest()
 
         # 行号转换为1-based（文件行号）
         start_line = rows[0].index + 1
@@ -242,11 +244,14 @@ class ScopeBuilderNode:
         start_line = rows[0].index + 1
         end_line = rows[-1].index + 1
 
+        # 生成基础ID（跨文件唯一）
+        base_content_hash = hashlib.md5(text.encode()).hexdigest()[:16]
+        base_id = hashlib.md5(f"{file_path}_{start_line}_{end_line}_{base_content_hash}".encode()).hexdigest()
+
         if not protected_element_overlength:
             # 未超长，返回单个块
-            bid = hashlib.md5(f"{file_path}_{rows[0].index}_{text[:20]}".encode()).hexdigest()
             return [ParsedBlock(
-                block_id=bid,
+                block_id=base_id,
                 content=text,
                 start_line=start_line,
                 end_line=end_line,
@@ -267,8 +272,8 @@ class ScopeBuilderNode:
             blocks = []
             total_chunks = len(chunks)
             for idx, (chunk_text, chunk_tags) in enumerate(chunks):
-                # 为每个子块生成唯一ID（基于原始ID和索引）
-                chunk_id = hashlib.md5(f"{file_path}_{rows[0].index}_{idx}_{chunk_text[:20]}".encode()).hexdigest()
+                # 为每个子块生成带序号的ID
+                chunk_id = f"{base_id}_{str(idx+1).zfill(3)}"  # 001, 002, ...
                 
                 # 估算子块的行号范围（简化：按比例分配）
                 if total_chunks == 1:
