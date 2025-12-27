@@ -68,7 +68,6 @@ class ParsingContext:
         """进入保护元素区域"""
         self.current_protected_element_id = element_id
         self.current_protected_type = element_type
-        self.current_protected_start_index = start_index
         self.protected_element_groups[element_id] = []
 
         if element_type == 'code':
@@ -78,9 +77,11 @@ class ParsingContext:
 
     def exit_protected_element(self):
         """退出保护元素区域"""
+        # 清除当前保护元素分组
+        if self.current_protected_element_id:
+            self.clear_protected_element(self.current_protected_element_id)
         self.current_protected_element_id = None
         self.current_protected_type = None
-        self.current_protected_start_index = None
         self.in_code_block = False
         self.in_table_block = False
 
