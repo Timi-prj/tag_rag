@@ -4,6 +4,7 @@ from src.common.types import ParsedBlock, Tag
 from src.modules.md_parser.nodes.row_parser import Row
 from src.modules.md_parser.nodes.tag_extractor import TagExtractorNode
 from src.modules.md_parser.nodes.parsing_context import ParsingContext
+from src.modules.md_parser.nodes.special_chunker import SpecialChunker
 
 
 class ScopeBuilderNode:
@@ -12,6 +13,7 @@ class ScopeBuilderNode:
     def __init__(self, config, tag_node: TagExtractorNode):
         self.config = config
         self.tag_node = tag_node
+        self.special_chunker = SpecialChunker(config)
 
     def run(self, rows: List[Row], file_path: str) -> List[ParsedBlock]:
         blocks = []
@@ -28,8 +30,8 @@ class ScopeBuilderNode:
                     # 如果有保护元素，先切分保护元素
                     if context.is_in_protected_element():
                         # 退出保护元素并切块
-                        block = self._flush_protected_element(context, file_path)
-                        if block:
+                        protected_blocks = self._flush_protected_element(context, file_path)
+                        for block in protected_blocks:
                             blocks.append(block)
                     # 再切分普通缓冲区
                     block = self._flush_buffer(context, file_path)
@@ -82,8 +84,8 @@ class ScopeBuilderNode:
                     # 退出代码块保护元素
                     context.add_row_to_protected_element(row)
                     context.is_splited_since_last_header = True
-                    block = self._flush_protected_element(context, file_path)
-                    if block:
+                    protected_blocks = self._flush_protected_element(context, file_path)
+                    for block in protected_blocks:
                         blocks.append(block)
                     context.exit_protected_element()
                 i += 1
@@ -108,8 +110,8 @@ class ScopeBuilderNode:
                 # 检查下一行是否仍然是表格行，如果不是则退出表格保护元素
                 if i < len(rows) and not rows[i].is_table:
                     context.is_splited_since_last_header = True
-                    block = self._flush_protected_element(context, file_path)
-                    if block:
+                    protected_blocks = self._flush_protected_element(context, file_path)
+                    for block in protected_blocks:
                         blocks.append(block)
                     context.exit_protected_element()
                 continue
@@ -206,18 +208,18 @@ class ScopeBuilderNode:
             protected_element_overlength=False  # 普通块没有保护元素超长
         )
 
-    def _flush_protected_element(self, context: ParsingContext, file_path: str) -> Optional[ParsedBlock]:
-        """将当前保护元素切分为一个块"""
+    def _flush_protected_element(self, context: ParsingContext, file_path: str) -> List[ParsedBlock]:
+        """将当前保护元素切分为一个或多个块（如果超长则使用特殊切块器拆分）"""
         if not context.current_protected_element_id:
-            return None
+            return []
 
         rows = context.get_protected_element_rows(context.current_protected_element_id)
         if not rows:
-            return None
+            return []
 
         text = "".join(r.text for r in rows).strip()
         if not text:
-            return None
+            return []
 
         active_tags = context.get_active_tags()
         header_path = context.get_header_path()
@@ -231,8 +233,6 @@ class ScopeBuilderNode:
             title_tag = Tag(key="title", value=header_path, original_text=f"#title/{header_path}")
             active_tags.append(title_tag)
 
-        bid = hashlib.md5(f"{file_path}_{rows[0].index}_{text[:20]}".encode()).hexdigest()
-
         # 检查保护元素是否单独超长
         element_len = sum(len(r.text) for r in rows)
         is_splited = context.is_splited_since_last_header
@@ -242,13 +242,60 @@ class ScopeBuilderNode:
         start_line = rows[0].index + 1
         end_line = rows[-1].index + 1
 
-        return ParsedBlock(
-            block_id=bid,
-            content=text,
-            start_line=start_line,
-            end_line=end_line,
-            tags=list(active_tags),
-            is_splited=is_splited,
-            protected_element_type=context.current_protected_type,
-            protected_element_overlength=protected_element_overlength
-        )
+        if not protected_element_overlength:
+            # 未超长，返回单个块
+            bid = hashlib.md5(f"{file_path}_{rows[0].index}_{text[:20]}".encode()).hexdigest()
+            return [ParsedBlock(
+                block_id=bid,
+                content=text,
+                start_line=start_line,
+                end_line=end_line,
+                tags=list(active_tags),
+                is_splited=is_splited,
+                protected_element_type=context.current_protected_type,
+                protected_element_overlength=False
+            )]
+        else:
+            # 超长保护元素，使用特殊切块器拆分
+            chunks = self.special_chunker.chunk_protected_element(
+                element_type=context.current_protected_type,
+                content=text,
+                original_tags=active_tags,
+                max_chars=self.config.chunk_max_chars
+            )
+            
+            blocks = []
+            total_chunks = len(chunks)
+            for idx, (chunk_text, chunk_tags) in enumerate(chunks):
+                # 为每个子块生成唯一ID（基于原始ID和索引）
+                chunk_id = hashlib.md5(f"{file_path}_{rows[0].index}_{idx}_{chunk_text[:20]}".encode()).hexdigest()
+                
+                # 估算子块的行号范围（简化：按比例分配）
+                if total_chunks == 1:
+                    chunk_start = start_line
+                    chunk_end = end_line
+                else:
+                    # 简单按字符比例估算行号
+                    total_chars = len(text)
+                    chunk_chars = len(chunk_text)
+                    chunk_ratio = chunk_chars / total_chars
+                    total_lines = end_line - start_line + 1
+                    chunk_lines = max(1, int(total_lines * chunk_ratio))
+                    chunk_start = start_line + int((total_lines - chunk_lines) * idx / total_chunks)
+                    chunk_end = chunk_start + chunk_lines - 1
+                    # 确保最后一个子块结束行不超过原始结束行
+                    if idx == total_chunks - 1:
+                        chunk_end = end_line
+                
+                blocks.append(ParsedBlock(
+                    block_id=chunk_id,
+                    content=chunk_text,
+                    start_line=chunk_start,
+                    end_line=chunk_end,
+                    tags=chunk_tags,
+                    is_splited=True,  # 超长切分的块标记为已切分
+                    protected_element_type=context.current_protected_type,
+                    protected_element_overlength=False  # 子块本身不超长
+                ))
+            
+            return blocks
