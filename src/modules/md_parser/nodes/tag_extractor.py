@@ -15,27 +15,23 @@ class TagExtractorNode:
             return None
             
         raw = text.strip()
-        content = raw[1:] # 去掉 #
         
-        # 1. 检查排除规则
+        # 处理种子标签：将 #?xxx/yyy 转换为 #seed/xxx/yyy
+        if raw.startswith(f"#{self.config.tag_prefix}"):
+            # 转换：去掉#?，加上#seed/，确保有斜杠分隔符
+            seed_content = raw[2:]  # 去掉 "#?"
+            raw = f"#seed/{seed_content}"
+        
+        content = raw[1:]  # 去掉 #
+        
+        # 1. 检查排除规则（使用转换后的raw）
         for pattern in self.config.exclude_patterns:
             if pattern.match(raw):
                 return None
 
         # 2. 解析 Key/Value
-        # 逻辑：如果是 "?city/beijing", key=city, value=beijing (seed tag)
-        # 逻辑：如果是 "python", key=tag, value=python
-        
-        if content.startswith(self.config.tag_prefix):
-            # 种子标签逻辑
-            real_content = content[len(self.config.tag_prefix):]
-            parts = real_content.split('/', 1)
-            key = parts[0]
-            value = parts[1] if len(parts) > 1 else "true"
-        else:
-            # 普通标签
-            parts = content.split('/', 1)
-            key = parts[0] if len(parts) > 1 else "topic"
-            value = parts[1] if len(parts) > 1 else parts[0]
+        parts = content.split('/', 1)
+        key = parts[0] if len(parts) > 1 else "topic"
+        value = parts[1] if len(parts) > 1 else parts[0]
 
         return Tag(key=key, value=value, original_text=raw)
