@@ -9,7 +9,7 @@ class TagExtractorNode:
     def __init__(self, config: ConfigManager):
         self.config = config
 
-    def extract_from_text(self, text: str, scope_level: int) -> Optional[Tag]:
+    def extract_from_text(self, text: str) -> Optional[Tag]:
         """从文本中解析标签，如果被过滤则返回 None"""
         if not text.strip().startswith("#"):
             return None
@@ -38,4 +38,4 @@ class TagExtractorNode:
             key = parts[0] if len(parts) > 1 else "topic"
             value = parts[1] if len(parts) > 1 else parts[0]
 
-        return Tag(key=key, value=value, original_text=raw, scope_level=scope_level)
+        return Tag(key=key, value=value, original_text=raw)

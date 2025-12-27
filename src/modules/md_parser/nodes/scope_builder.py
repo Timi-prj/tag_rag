@@ -57,7 +57,7 @@ class ScopeBuilderNode:
                 for idx in range(1, 7):
                     if context.heading_stack[idx] is not None:
                         current_lvl = idx
-                tag = self.tag_node.extract_from_text(row.clean_text, current_lvl)
+                tag = self.tag_node.extract_from_text(row.clean_text)
                 if tag:
                     context.add_tag(tag, current_lvl)
                 i += 1
@@ -180,6 +180,15 @@ class ScopeBuilderNode:
         active_tags = context.get_active_tags()
         header_path = context.get_header_path()
 
+        # 添加 file_path 作为 tag
+        file_tag = Tag(key="file_path", value=file_path, original_text=f"#file_path/{file_path}")
+        active_tags.append(file_tag)
+        
+        # 如果 header_path 非空，添加 title tag
+        if header_path:
+            title_tag = Tag(key="title", value=header_path, original_text=f"#title/{header_path}")
+            active_tags.append(title_tag)
+
         bid = hashlib.md5(f"{file_path}_{rows[0].index}_{text[:20]}".encode()).hexdigest()
 
         # 行号转换为1-based（文件行号）
@@ -187,13 +196,11 @@ class ScopeBuilderNode:
         end_line = rows[-1].index + 1
 
         return ParsedBlock(
-            file_path=file_path,
             block_id=bid,
             content=text,
             start_line=start_line,
             end_line=end_line,
             tags=list(active_tags),
-            header_path=header_path,
             is_splited=context.is_splited_since_last_header,
             protected_element_type=None,  # 普通块没有保护元素类型
             protected_element_overlength=False  # 普通块没有保护元素超长
@@ -215,6 +222,15 @@ class ScopeBuilderNode:
         active_tags = context.get_active_tags()
         header_path = context.get_header_path()
 
+        # 添加 file_path 作为 tag
+        file_tag = Tag(key="file_path", value=file_path, original_text=f"#file_path/{file_path}")
+        active_tags.append(file_tag)
+        
+        # 如果 header_path 非空，添加 title tag
+        if header_path:
+            title_tag = Tag(key="title", value=header_path, original_text=f"#title/{header_path}")
+            active_tags.append(title_tag)
+
         bid = hashlib.md5(f"{file_path}_{rows[0].index}_{text[:20]}".encode()).hexdigest()
 
         # 检查保护元素是否单独超长
@@ -227,13 +243,11 @@ class ScopeBuilderNode:
         end_line = rows[-1].index + 1
 
         return ParsedBlock(
-            file_path=file_path,
             block_id=bid,
             content=text,
             start_line=start_line,
             end_line=end_line,
             tags=list(active_tags),
-            header_path=header_path,
             is_splited=is_splited,
             protected_element_type=context.current_protected_type,
             protected_element_overlength=protected_element_overlength

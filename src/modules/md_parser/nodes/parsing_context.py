@@ -109,9 +109,26 @@ class ParsingContext:
         return active_tags
 
     def get_header_path(self) -> str:
-        """生成标题路径字符串，过滤掉None，忽略索引0（文档级别）"""
-        valid_headers = [h for h in self.heading_stack[1:] if h is not None]
-        return "/".join(valid_headers)
+        """生成标题路径字符串，空层级标记为null，忽略索引0（文档级别）"""
+        # 找到最大的非None标题级别
+        current_lvl = 0
+        for i in range(1, 7):
+            if self.heading_stack[i] is not None:
+                current_lvl = i
+        
+        # 如果没有标题，返回空字符串
+        if current_lvl == 0:
+            return ""
+        
+        # 从级别1到current_lvl构建路径，None用"null"替换
+        path_parts = []
+        for i in range(1, current_lvl + 1):
+            text = self.heading_stack[i]
+            if text is None:
+                path_parts.append("null")
+            else:
+                path_parts.append(text)
+        return "/".join(path_parts)
 
     def flush_buffer(self) -> List[Row]:
         """清空当前缓冲区并返回内容，用于生成块"""
