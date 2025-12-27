@@ -22,7 +22,7 @@ def main():
     vector_store = VectorStoreConnector()
 
     # --- 准备测试数据 ---
-    input_file = "README.md"
+    input_file = "test.md"
     # 如果文件不存在，创建一个假的用于演示
     if not os.path.exists(input_file):
         with open(input_file, 'w', encoding='utf-8') as f:

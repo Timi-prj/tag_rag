@@ -22,3 +22,6 @@ class ParsedBlock:
     end_line: int
     tags: List[Tag]     # 元数据
     header_path: str    # 如 "一级标题 > 二级标题"
+    is_splited: bool = False  # 新增：是否被切分
+    protected_element_type: Optional[str] = None  # 新增：保护元素类型（'code', 'table'）
+    protected_element_overlength: bool = False  # 新增：保护元素本身是否超长

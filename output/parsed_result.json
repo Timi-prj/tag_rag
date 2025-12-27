@@ -1,181 +1,153 @@
-import typing
-from typing import List, Dict, Optional
-from src.common.types import MarkdownElement, ElementType
-
-class ScopeBuilderNode:
-    """
-    作用域构建节点 (ScopeBuilder)
-    """
-
-    def __init__(self, config):
-        self.config = config
-        self.max_chars = self.config.chunk_max_chars
-        self.overlap = self.config.chunk_overlap
-        self.hard_max_chars = self.config.chunk_hard_max_chars
-
-        # 运行时状态
-        self.header_stack: List[MarkdownElement] = []
-        self.buffer_elements: List[Dict] = []
-        self.current_char_count = 0
-        self.file_path = "unknown" # 存储相对路径
-
-    def run(self, input_stream: typing.Generator, file_path: str) -> typing.Generator[Dict, None, None]:
-        """
-        :param input_stream: yield (element, tags)
-        :param file_path: 文件的相对路径 (例如: "folder/test.md")
-        """
-        self.file_path = file_path # 保存完整相对路径
-        self._reset_state()
-
-        for element, local_tags in input_stream:
-            # 1. 维护 Header 栈
-            if element.type == ElementType.HEADER:
-                self._update_header_stack(element)
-
-            # 2. 尝试添加元素到缓冲区
-            chunks = self._process_element(element, local_tags)
-            
-            for chunk in chunks:
-                if chunk:
-                    yield chunk
-
-        # 3. 处理剩余缓冲区
-        last_chunk = self._flush_buffer()
-        if last_chunk:
-            yield last_chunk
-
-    def _reset_state(self):
-        self.header_stack = []
-        self.buffer_elements = []
-        self.current_char_count = 0
-
-    def _update_header_stack(self, header: MarkdownElement):
-        while self.header_stack and self.header_stack[-1].level >= header.level:
-            self.header_stack.pop()
-        self.header_stack.append(header)
-
-    def _process_element(self, element: MarkdownElement, tags: List[Dict]) -> List[Dict]:
-        output_chunks = []
-        elem_len = len(element.content)
-
-        # 硬上限检查
-        if self.hard_max_chars > 0 and (self.current_char_count + elem_len > self.hard_max_chars):
-            chunk = self._flush_buffer()
-            if chunk: 
-                output_chunks.append(chunk)
-
-        # 软上限检查
-        elif (self.current_char_count + elem_len > self.max_chars) and self.buffer_elements:
-            chunk = self._flush_buffer()
-            if chunk:
-                output_chunks.append(chunk)
-        
-        self.buffer_elements.append({
-            "element": element,
-            "tags": tags,
-            "headers_snapshot": list(self.header_stack) 
-        })
-        self.current_char_count += elem_len
-        return output_chunks
-
-    def _flush_buffer(self) -> Optional[Dict]:
-        if not self.buffer_elements:
-            return None
-
-        # 1. 过滤逻辑：如果只有 Header 类型的元素，不输出
-        has_content = False
-        for item in self.buffer_elements:
-            if item['element'].type != ElementType.HEADER:
-                has_content = True
-                break
-        
-        if not has_content:
-            self.buffer_elements = []
-            self.current_char_count = 0
-            return None
-
-        # 2. 拼接文本
-        text_parts = [item['element'].content for item in self.buffer_elements]
-        full_text = "\n".join(text_parts)
-
-        # 3. 收集普通标签 (去重)
-        collected_tags = []
-        seen_tags = set()
-        for item in self.buffer_elements:
-            for tag in item['tags']:
-                tag_id = f"{tag.get('key')}:{tag.get('value')}"
-                if tag_id not in seen_tags:
-                    collected_tags.append(tag)
-                    seen_tags.add(tag_id)
-
-        # 4. 构建系统标签 (Title & FilePath)
-        system_tags = self._build_system_tags()
-        
-        final_tags = system_tags + collected_tags
-
-        chunk_data = {
-            "content": full_text,
-            "tags": final_tags,
-            "metadata": {
-                "char_count": len(full_text)
-            }
-        }
-
-        self.buffer_elements = []
-        self.current_char_count = 0
-        return chunk_data
-
-    def _build_system_tags(self) -> List[Dict]:
-        """
-        构建 file_path 和 title 的标签
-        """
-        sys_tags = []
-        
-        # --- File Path Tag ---
-        # 使用传入的相对路径
-        sys_tags.append({
-            "key": "file_path",
-            "value": self.file_path,
-            "original_text": f"#file_path/{self.file_path}",
-            "scope_level": 0
-        })
-
-        # --- Title Tag ---
-        if self.buffer_elements:
-            # 获取当前上下文的 header 栈
-            headers = self.buffer_elements[0]['headers_snapshot']
-            
-            if headers:
-                # 算法：根据 header 的 level 填充数组
-                # 1. 找出最大层级 (例如 H4 -> 4)
-                max_level = max(h.level for h in headers)
-                
-                # 2. 创建一个全为 'null' 的列表，长度为 max_level
-                # 索引 0 对应 H1, 索引 1 对应 H2 ...
-                path_parts = ["null"] * max_level
-                
-                # 3. 填充存在的标题
-                for h in headers:
-                    # h.level 是 1-based (H1=1), 所以索引是 h.level - 1
-                    # 防止越界保护 (虽然理论上 max_level 保证了不越界)
-                    if 0 < h.level <= max_level:
-                        path_parts[h.level - 1] = h.content
-                
-                # 4. 生成 value (仅包含非 null 的实际标题路径，看着更干净)
-                # 或者如果你希望 value 也包含 null，可以去掉 if p != "null"
-                # 根据示例 "方差/dc7..."，这里只取有效值拼接
-                real_path_str = "/".join([p for p in path_parts if p != "null"])
-                
-                # 5. 生成 original_text (包含 null 占位)
-                # 示例: #title/null/方差/dc7，3k1u/计算逻辑
-                full_path_str = "/".join(path_parts)
-                original_text = f"#title/{full_path_str}"
-                
-                sys_tags.append({
-                    "key": "title",
-                    "value": real_path_str,
-                    "original_text": original_text,
-                    "scope_level": len(headers) # 实际生效的层级深度
-                })
-
-        return sys_tags
+[
+  {
+    "file_path": "test.md",
+    "block_id": "4966055eb05b42f212a6f60d268dacc7",
+    "content": "阴阳骰子+5手卡（+1）在各难度下的成功率探索",
+    "start_line": 3,
+    "end_line": 3,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      }
+    ],
+    "header_path": "",
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "file_path": "test.md",
+    "block_id": "2458a174b9a64a5ee5ea9dc13357bbb1",
+    "content": "## promt\n我在设计一款桌游规则, 现在需要构筑数学模型. 有这么几种资源: \n- 明骰的3颗D6, 投掷结果已知; \n- 暗骰的1颗D6, 投掷结果未知(意味着分配+1指示物后再投掷结果, 可能导致消耗了资源却不满足要求); \n- 5个+1指示物, 可以使得骰子结果额外+1(可以超过6). \n当前目标: 单个组合的结果>=7\n流程如下: \n1. 玩家将资源任意分组组合(例如, 明骰的三颗骰子是3,4,6, 分配成3组资源, 分别是3的明骰+4的明骰; 6的明骰和1个指示物, 暗骰和4个指示物)\n2. 投掷暗骰(接之前的例子, 暗骰结果为1)\n3. 计算满足目标的组合数量 (因为1的暗骰和四个指示物的组合最终结果为5, 不满足目标, 最后只有2组组合满足条件; 但如果暗骰结果为3, 则最终结果为7, 满足条件)\n\n追求组合数量尽可能的多, 这种情况下, 最优解和组合数的期望是多少",
+    "start_line": 4,
+    "end_line": 16,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      },
+      {
+        "key": "type",
+        "value": "提示词",
+        "original_text": "#type/提示词",
+        "scope_level": 2
+      }
+    ],
+    "header_path": "promt",
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "file_path": "test.md",
+    "block_id": "656038d375749401a2a4b1e016acae3e",
+    "content": "## 期望\n1. **遍历所有已知骰子组合：** 运行我的穷举模型，遍历216种（或56种加权）已知骰子投掷结果。\n2. **获取每个组合的“最优策略”：** 对于每一种投掷结果（例如 `{1,2,3}`），模型已经找到了使其期望收益最大的最优策略（即，特定的分组方式和指示物分配方案）。\n3. **计算该策略下“>=2组合”的概率：**\n    - 这个策略会将资源分成“确定组”和“风险组”。\n    - **确定组的数量 (S)：** 这是固定的，不会变。\n    - **风险组的成功概率 (P)：** 这是由投入的指示物决定的。风险组最多只有1个（因为最优策略总会将未知骰子放在一个独立的组里）。\n    - 现在，我们需要计算最终成功组合数 `C = S + (风险组是否成功)` 大于等于2的概率。\n        - **如果 S >= 2：** 那么无论风险组是否成功，最终组合数都至少是2。概率是 **100%**。\n        - **如果 S = 1：** 那么需要风险组成功，最终组合数才能达到2。概率就是风险组的成功概率 **P**。\n        - **如果 S = 0：** 那么即使风险组成功，最终也只有1个组合，不可能达到2。概率是 **0%**。\n4. **加权平均：** 将每种已知骰子投掷结果（216种）所对应的“>=2组合”的概率相加，然后除以216，得到最终的总概率。",
+    "start_line": 18,
+    "end_line": 30,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      },
+      {
+        "key": "type",
+        "value": "输出结果",
+        "original_text": "#type/输出结果",
+        "scope_level": 2
+      }
+    ],
+    "header_path": "期望",
+    "is_splited": true,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "file_path": "test.md",
+    "block_id": "59a32d864bdddc6a5d2a669cf509d723",
+    "content": "|  目标值   | 3已知+1未知 (期望) | 2已知+2未知 (期望) | 1已知+3未知 (期望) |\n| :----: | :----------: | :----------: | :----------: |\n| **7**  |    ~2.21     |    ~1.94     |    ~1.67     |\n| **8**  |    ~1.61     |    ~1.40     |    ~1.22     |\n| **9**  |    ~1.16     |    ~1.03     |    ~0.91     |\n| **10** |    ~0.92     |    ~0.82     |    ~0.73     |\n| **11** |    ~0.72     |    ~0.65     |    ~0.59     |\n| **12** |    ~0.56     |    ~0.51     |    ~0.47     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |\n| **13** |    ~0.42     |    ~0.38     |    ~0.35     |",
+    "start_line": 31,
+    "end_line": 74,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      },
+      {
+        "key": "type",
+        "value": "输出结果",
+        "original_text": "#type/输出结果",
+        "scope_level": 2
+      }
+    ],
+    "header_path": "期望",
+    "is_splited": true,
+    "protected_element_type": "table",
+    "protected_element_overlength": true
+  },
+  {
+    "file_path": "test.md",
+    "block_id": "a5b3689e0594b3d92d06cd916320e8c9",
+    "content": "## 方差",
+    "start_line": 76,
+    "end_line": 76,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      }
+    ],
+    "header_path": "方差",
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "file_path": "test.md",
+    "block_id": "a4cb2a2184837f0ac8135cf1a81a475e",
+    "content": "### dc7，3k1u\n\n难度7, 3k+1u下, 能至少2个组合的概率是多少?\n**70.1%**",
+    "start_line": 78,
+    "end_line": 81,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      }
+    ],
+    "header_path": "方差/dc7，3k1u",
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  },
+  {
+    "file_path": "test.md",
+    "block_id": "7b108b19e0c2d7f5d1175658c5c1936b",
+    "content": "#### 计算逻辑\n\n1. **遍历所有已知骰子组合：** 运行我的穷举模型，遍历216种（或56种加权）已知骰子投掷结果。\n2. **获取每个组合的“最优策略”：** 对于每一种投掷结果（例如 `{1,2,3}`），模型已经找到了使其期望收益最大的最优策略（即，特定的分组方式和指示物分配方案）。\n3. **计算该策略下“>=2组合”的概率：**\n    - 这个策略会将资源分成“确定组”和“风险组”。\n    - **确定组的数量 (S)：** 这是固定的，不会变。\n    - **风险组的成功概率 (P)：** 这是由投入的指示物决定的。风险组最多只有1个（因为最优策略总会将未知骰子放在一个独立的组里）。\n    - 现在，我们需要计算最终成功组合数 `C = S + (风险组是否成功)` 大于等于2的概率。\n        - **如果 S >= 2：** 那么无论风险组是否成功，最终组合数都至少是2。概率是 **100%**。\n        - **如果 S = 1：** 那么需要风险组成功，最终组合数才能达到2。概率就是风险组的成功概率 **P**。\n        - **如果 S = 0：** 那么即使风险组成功，最终也只有1个组合，不可能达到2。概率是 **0%**。\n4. **加权平均：** 将每种已知骰子投掷结果（216种）所对应的“>=2组合”的概率相加，然后除以216，得到最终的总概率。",
+    "start_line": 82,
+    "end_line": 94,
+    "tags": [
+      {
+        "key": "project",
+        "value": "聊斋志",
+        "original_text": "#project/聊斋志",
+        "scope_level": 0
+      }
+    ],
+    "header_path": "方差/dc7，3k1u/计算逻辑",
+    "is_splited": false,
+    "protected_element_type": null,
+    "protected_element_overlength": false
+  }
+]
