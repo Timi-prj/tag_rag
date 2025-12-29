@@ -47,6 +47,13 @@ class ConfigManager:
         self.embedding_model = embedding_conf.get('model', 'text-embedding-3-small')
         self.embedding_api_key = embedding_conf.get('api_key', '')
         
+        # 速率限制配置
+        rate_limit_conf = embedding_conf.get('rate_limit', {})
+        self.embedding_rpm = rate_limit_conf.get('rpm', 10)
+        self.embedding_tpm = rate_limit_conf.get('tpm', 10000)
+        self.embedding_enable_adaptive_delay = rate_limit_conf.get('enable_adaptive_delay', True)
+        self.embedding_request_delay = rate_limit_conf.get('request_delay', 0.5)
+        
         # ChromaDB配置
         chroma_conf = v_conf.get('chromadb', {})
         self.chroma_persist_directory = chroma_conf.get('persist_directory', './chroma_db')

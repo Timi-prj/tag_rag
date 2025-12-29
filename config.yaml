@@ -4,8 +4,8 @@ parser:
   output_dir: "./output"
   file_extensions: [".md", ".markdown"]  # 文件后缀白名单
   chunk_strategy:
-    max_chars: 1000
-    overlap_rows: 2
+    max_chars: 450
+    overlap_rows: 1
 
 tags:
   prefix: "?"
@@ -21,9 +21,18 @@ vector_store:
   batch_size: 512
   embedding:
     api_base: "https://api.siliconflow.cn/v1"
-    # api_key 优先从环境变量 OPENAI_API_KEY 读取，其次使用此处配置
+    # api_key 优先从配置文件读取，其次使用环境变量 OPENAI_API_KEY
     api_key: "sk-ledrdtxjpsdhmmtkqfnktbvukzkwjloloubbhdvukpuvqprc"
     model: "BAAI/bge-large-zh-v1.5"
+    # API速率限制配置 (RPM: 每分钟请求数, TPM: 每分钟令牌数)
+    # 默认值基于SiliconFlow免费账户限制，可根据需要调整
+    rate_limit:
+      rpm: 1800       # 每分钟最多10个请求 (免费账户限制)
+      tpm: 450000     # 每分钟最多10000个令牌
+      # 启用自适应延迟以避免触发限制
+      enable_adaptive_delay: true
+      # 初始延迟（秒）在请求之间
+      request_delay: 0.5
   chromadb:
     persist_directory: "./chroma_db"
     collection_name: "tag_rag_vectors"
