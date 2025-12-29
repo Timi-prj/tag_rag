@@ -11,6 +11,18 @@ class VectorStoreConnector:
         self.config = ConfigManager()
         print(f"[Module 2] Initialized Vector Store with dim={self.config.vector_dim}")
 
+    def _build_augmented_text(self, block: ParsedBlock) -> str:
+        """构建增强文本：将标签转换为 key: value 格式并拼接在内容前"""
+        if block.protected_element_type is not None:
+            # 保护元素块不增强
+            return block.content
+        tag_strs = [f"{tag.key}: {tag.value}" for tag in block.tags]
+        parts = []
+        if tag_strs:
+            parts.extend(tag_strs)
+        parts.append(block.content)
+        return " ".join(parts)
+
     def save_blocks(self, blocks: List[ParsedBlock]):
         """
         待实现：
@@ -20,4 +32,10 @@ class VectorStoreConnector:
         """
         print(f"[Module 2] Placeholder: Received {len(blocks)} blocks to vectorize.")
         for b in blocks[:2]:
-            print(f"   -> Would vectorise: {b.block_id} (Tags: {len(b.tags)})")
+            augmented = self._build_augmented_text(b)
+            print(f"   -> Block {b.block_id}:")
+            print(f"      Original content: {b.content[:100]}..." if len(b.content) > 100 else f"      Original content: {b.content}")
+            print(f"      Augmented text: {augmented[:150]}..." if len(augmented) > 150 else f"      Augmented text: {augmented}")
+            print(f"      Tags: {len(b.tags)}")
+            if b.protected_element_type:
+                print(f"      Protected element type: {b.protected_element_type}")

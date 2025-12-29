@@ -15,7 +15,7 @@ class ParsedBlock:
     包含原文片段和解析出的元数据。
     """
     block_id: str       # 唯一ID
-    content: str        # 待向量化的文本
+    content: str        # 文本
     start_line: int
     end_line: int
     tags: List[Tag]     # 元数据

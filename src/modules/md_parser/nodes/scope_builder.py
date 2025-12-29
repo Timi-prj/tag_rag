@@ -15,6 +15,32 @@ class ScopeBuilderNode:
         self.tag_node = tag_node
         self.special_chunker = SpecialChunker(config)
 
+    def _should_discard_block(self, text: str) -> bool:
+        """
+        判断是否应舍弃该块：内容仅包含标题行（以1-6个#开头，后跟空格和文本）
+        且无其他实质性内容。
+        """
+        lines = text.strip().splitlines()
+        if not lines:
+            return True  # 空内容
+        # 检查每一行是否都是标题行（允许前后有空行，但已strip）
+        for line in lines:
+            stripped = line.strip()
+            # 标题行模式：以1-6个#开头，后跟至少一个空格，然后有非空文本
+            if not (stripped.startswith('#') and ' ' in stripped):
+                return False  # 非标题行，保留块
+            # 验证#数量在1-6之间（标题级别）
+            hash_count = 0
+            for char in stripped:
+                if char == '#':
+                    hash_count += 1
+                else:
+                    break
+            if hash_count < 1 or hash_count > 6 or stripped[hash_count] != ' ':
+                return False  # 不符合标题格式，保留块
+        # 所有行都是标题行，舍弃
+        return True
+
     def run(self, rows: List[Row], file_path: str) -> List[ParsedBlock]:
         blocks = []
         context = ParsingContext()
@@ -177,6 +203,10 @@ class ScopeBuilderNode:
 
         text = "".join(r.text for r in rows).strip()
         if not text:
+            return None
+
+        # 舍弃仅包含标题的块
+        if self._should_discard_block(text):
             return None
 
         active_tags = context.get_active_tags()
