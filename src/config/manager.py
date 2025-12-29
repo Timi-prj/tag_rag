@@ -35,6 +35,25 @@ class ConfigManager:
             re.compile(p) for p in t_conf.get('exclude_regex', [])
         ]
 
-        # 模块二配置 (预留)
+        # 模块二配置
         v_conf = self._raw.get('vector_store', {})
         self.vector_dim = v_conf.get('dimension', 1536)
+        self.vector_store_provider = v_conf.get('provider', 'chromadb')
+        self.batch_size = v_conf.get('batch_size', 32)
+        
+        # 嵌入配置
+        embedding_conf = v_conf.get('embedding', {})
+        self.embedding_api_base = embedding_conf.get('api_base', 'https://api.openai.com/v1')
+        self.embedding_model = embedding_conf.get('model', 'text-embedding-3-small')
+        self.embedding_api_key = embedding_conf.get('api_key', '')
+        
+        # ChromaDB配置
+        chroma_conf = v_conf.get('chromadb', {})
+        self.chroma_persist_directory = chroma_conf.get('persist_directory', './chroma_db')
+        self.chroma_collection_name = chroma_conf.get('collection_name', 'tag_rag_vectors')
+
+        # 日志配置
+        log_conf = self._raw.get('logging', {})
+        self.log_level = log_conf.get('level', 'INFO')
+        self.log_format = log_conf.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.log_handlers = log_conf.get('handlers', {})

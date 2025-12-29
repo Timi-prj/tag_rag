@@ -8,6 +8,8 @@ from typing import List
 # 路径 Hack (确保 Docker 容器内能找到包)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from src.common.logger import configure_logging, get_logger
+
 from src.config.manager import ConfigManager
 from src.modules.md_parser.pipeline import MarkdownParserPipeline
 from src.modules.vector_store.connector import VectorStoreConnector
@@ -24,8 +26,16 @@ def process_files(*file_paths: str, output_json: bool = True) -> List[dict]:
     Returns:
         List[dict]: 所有文件的块字典列表
     """
-    print(">>> System Initializing...")
+    # 初始化日志
     config = ConfigManager()
+    configure_logging({
+        'level': config.log_level,
+        'format': config.log_format,
+        'handlers': config.log_handlers
+    })
+    logger = get_logger('tag_rag.main')
+    
+    logger.info("System Initializing...")
     
     # 实例化模块一 (解析管道)
     parser_pipeline = MarkdownParserPipeline()
@@ -35,14 +45,14 @@ def process_files(*file_paths: str, output_json: bool = True) -> List[dict]:
 
     if not file_paths:
         # 如果没有提供文件路径，则处理配置目录下的所有文件
-        print(f">>> No files specified, processing directory: {config.input_dir}")
+        logger.info(f"No files specified, processing directory: {config.input_dir}")
         blocks = parser_pipeline.process_directory()
     else:
         # 处理指定的文件列表
-        print(f">>> Processing {len(file_paths)} specified file(s)...")
+        logger.info(f"Processing {len(file_paths)} specified file(s)...")
         blocks = parser_pipeline.process_files(*file_paths)
     
-    print(f">>> Generated {len(blocks)} blocks in total.")
+    logger.info(f"Generated {len(blocks)} blocks in total.")
     
     # 保存中间结果 (可选，方便调试)
     if output_json:
@@ -50,13 +60,13 @@ def process_files(*file_paths: str, output_json: bool = True) -> List[dict]:
         out_path = os.path.join(config.output_dir, "parsed_result.json")
         with open(out_path, 'w', encoding='utf-8') as f:
             json.dump([asdict(b) for b in blocks], f, ensure_ascii=False, indent=2)
-        print(f">>> Intermediate result saved to {out_path}")
+        logger.info(f"Intermediate result saved to {out_path}")
     
     # 模块二消费
-    print(">>> Running Module 2: Vectorizing...")
+    logger.info("Running Module 2: Vectorizing...")
     vector_store.save_blocks(blocks)
     
-    print(">>> Done.")
+    logger.info("Done.")
     return [asdict(b) for b in blocks]
 
 
@@ -71,8 +81,16 @@ def process_directory(directory_path: str = None, output_json: bool = True) -> L
     Returns:
         List[dict]: 所有文件的块字典列表
     """
-    print(">>> System Initializing...")
+    # 初始化日志
     config = ConfigManager()
+    configure_logging({
+        'level': config.log_level,
+        'format': config.log_format,
+        'handlers': config.log_handlers
+    })
+    logger = get_logger('tag_rag.main')
+    
+    logger.info("System Initializing...")
     
     # 实例化模块一 (解析管道)
     parser_pipeline = MarkdownParserPipeline()
@@ -80,10 +98,10 @@ def process_directory(directory_path: str = None, output_json: bool = True) -> L
     # 实例化模块二 (向量存储连接器)
     vector_store = VectorStoreConnector()
 
-    print(f">>> Processing directory: {directory_path or config.input_dir}")
+    logger.info(f"Processing directory: {directory_path or config.input_dir}")
     blocks = parser_pipeline.process_directory(directory_path)
     
-    print(f">>> Generated {len(blocks)} blocks in total.")
+    logger.info(f"Generated {len(blocks)} blocks in total.")
     
     # 保存中间结果 (可选，方便调试)
     if output_json:
@@ -91,13 +109,13 @@ def process_directory(directory_path: str = None, output_json: bool = True) -> L
         out_path = os.path.join(config.output_dir, "parsed_result.json")
         with open(out_path, 'w', encoding='utf-8') as f:
             json.dump([asdict(b) for b in blocks], f, ensure_ascii=False, indent=2)
-        print(f">>> Intermediate result saved to {out_path}")
+        logger.info(f"Intermediate result saved to {out_path}")
     
     # 模块二消费
-    print(">>> Running Module 2: Vectorizing...")
+    logger.info("Running Module 2: Vectorizing...")
     vector_store.save_blocks(blocks)
     
-    print(">>> Done.")
+    logger.info("Done.")
     return [asdict(b) for b in blocks]
 
 
@@ -111,8 +129,16 @@ def main():
     
     args = parser.parse_args()
     
-    print(">>> System Initializing...")
+    # 初始化日志
     config = ConfigManager()
+    configure_logging({
+        'level': config.log_level,
+        'format': config.log_format,
+        'handlers': config.log_handlers
+    })
+    logger = get_logger('tag_rag.main')
+    
+    logger.info("System Initializing...")
     
     # 实例化模块一 (解析管道)
     parser_pipeline = MarkdownParserPipeline()
@@ -125,18 +151,18 @@ def main():
     # 确定要处理的文件
     if args.dir:
         # 处理指定目录
-        print(f">>> Processing directory: {args.dir}")
+        logger.info(f"Processing directory: {args.dir}")
         blocks = parser_pipeline.process_directory(args.dir)
     elif args.files:
         # 处理指定的文件列表
-        print(f">>> Processing {len(args.files)} specified file(s)...")
+        logger.info(f"Processing {len(args.files)} specified file(s)...")
         blocks = parser_pipeline.process_files(*args.files)
     else:
         # 默认处理配置目录下的所有文件
-        print(f">>> No files specified, processing directory: {config.input_dir}")
+        logger.info(f"No files specified, processing directory: {config.input_dir}")
         blocks = parser_pipeline.process_directory()
     
-    print(f">>> Generated {len(blocks)} blocks in total.")
+    logger.info(f"Generated {len(blocks)} blocks in total.")
     
     # 保存中间结果 (可选，方便调试)
     if not args.no_json:
@@ -144,14 +170,14 @@ def main():
         out_path = os.path.join(config.output_dir, "parsed_result.json")
         with open(out_path, 'w', encoding='utf-8') as f:
             json.dump([asdict(b) for b in blocks], f, ensure_ascii=False, indent=2)
-        print(f">>> Intermediate result saved to {out_path}")
+        logger.info(f"Intermediate result saved to {out_path}")
     
     # 模块二消费
     if not args.no_vectorize:
-        print(">>> Running Module 2: Vectorizing...")
+        logger.info("Running Module 2: Vectorizing...")
         vector_store.save_blocks(blocks)
     
-    print(">>> Done.")
+    logger.info("Done.")
 
 
 if __name__ == "__main__":

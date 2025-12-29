@@ -7,6 +7,7 @@ services:
     # Windows 上的修改会立即同步到容器内
     volumes:
       - .:/app
+      - ./logs:/app/logs
     # 让容器保持运行状态，不立即退出
     # 相当于 hang 住容器，方便你随时进入执行命令
     command: tail -f /dev/null
