@@ -18,7 +18,7 @@ vector_store:
   provider: "chromadb" # 或 openai, milvus
   collection_name: "knowledge_base"
   dimension: 1024
-  batch_size: 512
+  batch_size: 16
   embedding:
     api_base: "https://api.siliconflow.cn/v1"
     # api_key 优先从配置文件读取，其次使用环境变量 OPENAI_API_KEY

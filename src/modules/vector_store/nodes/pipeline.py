@@ -71,21 +71,6 @@ class VectorStorePipeline:
 
         return success_count, failure_count, failed_block_ids
 
-    def process_single(self, block: ParsedBlock) -> bool:
-        """处理单个块，返回是否成功"""
-        try:
-            # 1. 文本增强
-            augmented_text = self.augmenter.augment_batch([block])[0]
-
-            # 2. 嵌入生成
-            vector = self.embedder.embed_batch([augmented_text])[0]
-
-            # 3. 存储
-            self.store.store_single(vector, block)
-            return True
-        except Exception as e:
-            print(f"块 {block.block_id} 处理失败: {e}")
-            return False
 
     def get_stats(self) -> dict:
         """获取管道统计信息（可扩展）"""

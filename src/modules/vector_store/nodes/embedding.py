@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from datetime import datetime, timedelta
 from openai import OpenAI, OpenAIError
 from src.config.manager import ConfigManager
+from src.common.logger import get_logger
 
 
 class RateLimiter:
@@ -123,6 +124,7 @@ class EmbeddingNode:
         self.client = self._init_client()
         self._dimension = self.config.vector_dim
         self._model = self.config.embedding_model
+        self.logger = get_logger('tag_rag.embedding')
         
         # 初始化速率限制器
         self.rate_limiter = RateLimiter(
@@ -145,18 +147,10 @@ class EmbeddingNode:
             # 如果配置中没有，尝试从环境变量读取
             api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("未设置OpenAI API密钥：请在配置文件中配置 embedding.api_key 或设置环境变量 OPENAI_API_KEY")
+            raise ValueError("未设置OpenAI API密钥：请在配置文件中配置 embedding.api_key（优先）或设置环境变量 OPENAI_API_KEY")
 
         base_url = self.config.embedding_api_base
         return OpenAI(api_key=api_key, base_url=base_url)
-
-    def _estimate_tokens(self, text: str) -> int:
-        """估算文本的令牌数"""
-        # 简单估算：中文字符*1.3 + 其他字符*0.25
-        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
-        other_chars = len(text) - chinese_chars
-        estimated = int(chinese_chars * 1.3 + other_chars * 0.25)
-        return max(estimated, 1)
 
     def _create_batches(self, texts: List[str]) -> List[List[str]]:
         """根据令牌限制创建批处理"""
@@ -165,7 +159,7 @@ class EmbeddingNode:
         current_tokens = 0
         
         for text in texts:
-            text_tokens = self._estimate_tokens(text)
+            text_tokens = self.rate_limiter._estimate_tokens(text)
             
             # 如果单个文本超过限制，需要单独处理
             if text_tokens > self.max_tokens_per_request:
@@ -252,12 +246,12 @@ class EmbeddingNode:
                 results.extend(embeddings)
             except Exception as e:
                 # 如果单个批次失败，记录错误但继续处理其他批次
-                print(f"批次 {i+1}/{len(batches)} 处理失败: {e}")
+                self.logger.error(f"批次 {i+1}/{len(batches)} 处理失败: {e}")
                 # 为失败的批次添加空向量占位符
                 results.extend([None] * len(batch))
         
         if total_wait_time > 0:
-            print(f"速率限制等待总时间: {total_wait_time:.2f}秒")
+            self.logger.info(f"速率限制等待总时间: {total_wait_time:.2f}秒")
         
         return results
 

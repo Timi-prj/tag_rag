@@ -25,8 +25,8 @@ class ConfigManager:
         self.input_dir = p_conf.get('input_dir', './data')
         self.output_dir = p_conf.get('output_dir', './output')
         self.file_extensions = p_conf.get('file_extensions', ['.md', '.markdown'])
-        self.chunk_max_chars = p_conf.get('chunk_strategy', {}).get('max_chars', 1000)
-        self.chunk_overlap = p_conf.get('chunk_strategy', {}).get('overlap_rows', 2)
+        self.chunk_max_chars = p_conf.get('chunk_strategy', {}).get('max_chars', 450)
+        self.chunk_overlap = p_conf.get('chunk_strategy', {}).get('overlap_rows', 1)
 
         # 标签配置
         t_conf = self._raw.get('tags', {})
@@ -37,20 +37,20 @@ class ConfigManager:
 
         # 模块二配置
         v_conf = self._raw.get('vector_store', {})
-        self.vector_dim = v_conf.get('dimension', 1536)
+        self.vector_dim = v_conf.get('dimension', 1024)
         self.vector_store_provider = v_conf.get('provider', 'chromadb')
-        self.batch_size = v_conf.get('batch_size', 32)
+        self.batch_size = v_conf.get('batch_size', 512)
         
         # 嵌入配置
         embedding_conf = v_conf.get('embedding', {})
-        self.embedding_api_base = embedding_conf.get('api_base', 'https://api.openai.com/v1')
-        self.embedding_model = embedding_conf.get('model', 'text-embedding-3-small')
+        self.embedding_api_base = embedding_conf.get('api_base', 'https://api.siliconflow.cn/v1')
+        self.embedding_model = embedding_conf.get('model', 'BAAI/bge-large-zh-v1.5')
         self.embedding_api_key = embedding_conf.get('api_key', '')
         
         # 速率限制配置
         rate_limit_conf = embedding_conf.get('rate_limit', {})
-        self.embedding_rpm = rate_limit_conf.get('rpm', 10)
-        self.embedding_tpm = rate_limit_conf.get('tpm', 10000)
+        self.embedding_rpm = rate_limit_conf.get('rpm', 1800)
+        self.embedding_tpm = rate_limit_conf.get('tpm', 450000)
         self.embedding_enable_adaptive_delay = rate_limit_conf.get('enable_adaptive_delay', True)
         self.embedding_request_delay = rate_limit_conf.get('request_delay', 0.5)
         
